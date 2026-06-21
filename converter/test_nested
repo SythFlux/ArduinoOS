@@ -1,0 +1,23 @@
+100 SET a 
+110 SET b
+120 SET c
+120 SET d
+WHILE GET a 111 LESSTHAN
+DO
+    IF GET a GET b EQUALS 
+    THEN
+        "a == b" PRINTLN
+        IF GET c GET d EQUALS 
+        THEN
+            "c == d" PRINTLN
+        ENDIF
+    ELSE
+        "a != b" PRINTLN 
+        IF GET c GET d EQUALS 
+        THEN
+            "c == d" PRINTLN
+        ENDIF
+    ENDIF
+    GET a INCREMENT SET a
+ENDWHILE
+STOP
