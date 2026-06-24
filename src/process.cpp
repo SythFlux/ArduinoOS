@@ -99,14 +99,18 @@ void runCommand() {
 }
 
 void listCommand() {
-  Serial.println(F("id  state  name"));
+  Serial.println(F("id  state  pc    vars  name"));
   for (int i = 0; i < MAX_PROCESSES; i++) {
     ProcessType &p = processTable[i];
     if (p.state == TERMINATED) continue;
     Serial.print(p.pid);
     Serial.print(F("   "));
-    Serial.print(p.state == RUNNING ? F("run ") : F("pause"));
+    Serial.print(p.state == RUNNING ? F("run  ") : F("pause"));
     Serial.print(F("  "));
+    Serial.print(p.pc);              // program counter of this process
+    Serial.print(F("   "));
+    Serial.print(countProcessVariables(p.pid)); // variables owned by this process
+    Serial.print(F("     "));
     Serial.println(p.name);
   }
 }

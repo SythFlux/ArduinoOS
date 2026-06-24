@@ -38,4 +38,8 @@ void readVariable(byte name, int processId);
 // Frees every variable belonging to `processId` (called when a process ends).
 void clearProcessVariables(int processId);
 
+// Returns how many variables currently belong to `processId` (used by LIST to
+// show the variable-to-process coupling).
+byte countProcessVariables(int processId);
+
 #endif // MEMORY_H

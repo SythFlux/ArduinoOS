@@ -242,7 +242,13 @@ void execute(int index) {
     case MILLIS: pushInt((int)millis());         break;
     case DELAYUNTIL: {
       float target = popVal(true); // peek
-      if (target > (float)millis()) cur->pc -= 1; // not yet: re-run this instr
+      // The millisecond counter is 16-bit (see MILLIS) and wraps every ~65 s,
+      // so a plain `target > now` comparison breaks at the wrap boundary and
+      // the loop runs full speed. Compare with a signed 16-bit difference,
+      // which stays correct across the wrap (valid for delays up to ~32 s).
+      unsigned int now16 = (unsigned int)millis();
+      unsigned int tgt16 = (unsigned int)(long)target;
+      if ((int)(tgt16 - now16) > 0) cur->pc -= 1; // target still ahead: wait
       else popVal();                              // reached: consume the value
       break;
     }

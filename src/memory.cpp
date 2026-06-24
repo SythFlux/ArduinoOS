@@ -113,3 +113,11 @@ void clearProcessVariables(int processId) {
     }
   }
 }
+
+byte countProcessVariables(int processId) {
+  byte count = 0;
+  for (byte i = 0; i < noOfVars; i++) {
+    if (memTable[i].processId == processId) count++;
+  }
+  return count;
+}

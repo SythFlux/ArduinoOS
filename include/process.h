@@ -1,11 +1,3 @@
-/*
- * process.h
- * ---------
- * The process table and process life-cycle. Each process runs a bytecode file
- * and owns its own registers (PC, FP, SP, loop register) and stack. Processes
- * can be started, paused, resumed and killed; runProcesses() advances every
- * RUNNING process by one instruction.
- */
 
 #ifndef PROCESS_H
 #define PROCESS_H
@@ -28,13 +20,15 @@ struct ProcessType {
 // The process table is shared with the instruction interpreter.
 extern ProcessType processTable[MAX_PROCESSES];
 
-// ---- Life cycle -----------------------------------------------------------
-// Starts file `name` as a new process. Returns the new pid, or -1 on failure
-// (no free table slot, or file not found). Used by RUN and the FORK opcode.
+// Life cycle
+
 int startProcess(const char *name);
 
-// Returns the table index of the (non-terminated) process with id `pid`, or -1.
+// Returns the table index of the non terminated process with id `pid`, or -1.
 int findProcessByPid(int pid);
+
+
+
 
 // Advances every RUNNING process by one instruction. Defined in instructions
 // .cpp because it drives the interpreter; declared here as it is process work.
