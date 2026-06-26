@@ -1,39 +1,26 @@
-/*
- * filesystem.cpp - EEPROM-backed file system implementation.
- */
+// EEPROM-backed file system.
 
 #include <EEPROM.h>
 #include "filesystem.h"
-#include "cli.h"     // waitForToken(), runWhileWaiting helpers
-#include "process.h" // runProcesses() so processes keep ticking during STORE
+#include "cli.h"
+#include "process.h"
 
-// ---------------------------------------------------------------------------
-// EEPROM layout constants
-// ---------------------------------------------------------------------------
 static const int NO_OF_FILES_ADDR = MAX_FILES * sizeof(FATEntry);
 static const int FS_MAGIC_ADDR = NO_OF_FILES_ADDR + 1;
-static const int DATA_START = NO_OF_FILES_ADDR + 2; // first byte usable for data
-static const byte FS_MAGIC = 0x42;                  // "file system initialised"
+static const int DATA_START = NO_OF_FILES_ADDR + 2;
+static const byte FS_MAGIC = 0x42;
 
-// noOfFiles lives in EEPROM and survives power loss; EERef lets us use it like
-// a normal one-byte variable.
+// Lives in EEPROM so it survives power loss; EERef lets us treat it as a byte.
 static EERef noOfFiles = EEPROM[NO_OF_FILES_ADDR];
 
-// ---------------------------------------------------------------------------
-// Setup
-// ---------------------------------------------------------------------------
 void fsBegin() {
-  // On a brand-new chip EEPROM is filled with 0xFF; detect that with a magic
-  // byte and format the file system the first time only.
+  // Fresh chips read 0xFF everywhere; format once, detected via the magic byte.
   if (EEPROM.read(FS_MAGIC_ADDR) != FS_MAGIC) {
     noOfFiles = 0;
     EEPROM.update(FS_MAGIC_ADDR, FS_MAGIC);
   }
 }
 
-// ---------------------------------------------------------------------------
-// Low-level EEPROM access
-// ---------------------------------------------------------------------------
 byte readByteEEPROM(int address) {
   return EEPROM.read(address);
 }
@@ -42,9 +29,6 @@ void writeByteEEPROM(int address, byte value) {
   EEPROM.update(address, value); // update() skips the write if unchanged
 }
 
-// ---------------------------------------------------------------------------
-// FAT entry read / write
-// ---------------------------------------------------------------------------
 static void readFATEntry(int index, FATEntry &entry) {
   EEPROM.get(index * sizeof(FATEntry), entry);
 }
@@ -53,9 +37,6 @@ static void writeFATEntry(int index, const FATEntry &entry) {
   EEPROM.put(index * sizeof(FATEntry), entry);
 }
 
-// ---------------------------------------------------------------------------
-// FAT helpers
-// ---------------------------------------------------------------------------
 int findFile(const char *name) {
   FATEntry entry;
   for (int i = 0; i < noOfFiles; i++) {
@@ -75,12 +56,11 @@ bool getFileInfo(const char *name, int &start, int &size) {
   return true;
 }
 
-// Copy the FAT into `out` and sort it ascending by start address. Returns the
-// number of entries. Used by the free-space algorithms below.
+// Copies the FAT into `out` sorted by start address; returns the entry count.
 static int sortedFAT(FATEntry out[]) {
   int n = noOfFiles;
   for (int i = 0; i < n; i++) readFATEntry(i, out[i]);
-  for (int i = 1; i < n; i++) { // simple insertion sort (n is small)
+  for (int i = 1; i < n; i++) {
     FATEntry key = out[i];
     int j = i - 1;
     while (j >= 0 && out[j].start > key.start) {
@@ -97,10 +77,10 @@ int findFreeSpace(int size) {
   int n = sortedFAT(fat);
   int prevEnd = DATA_START;
   for (int i = 0; i < n; i++) {
-    if (fat[i].start - prevEnd >= size) return prevEnd; // gap before this file
+    if (fat[i].start - prevEnd >= size) return prevEnd;
     prevEnd = fat[i].start + fat[i].size;
   }
-  if ((int)EEPROM.length() - prevEnd >= size) return prevEnd; // gap at the end
+  if ((int)EEPROM.length() - prevEnd >= size) return prevEnd;
   return -1;
 }
 
@@ -120,9 +100,9 @@ int maxFreeSpace() {
 }
 
 bool createFile(const char *name, int size, int &startAddress) {
-  if (noOfFiles >= MAX_FILES) return false; // FAT full
+  if (noOfFiles >= MAX_FILES) return false;
   startAddress = findFreeSpace(size);
-  if (startAddress < 0) return false;       // no room on "disk"
+  if (startAddress < 0) return false;
 
   FATEntry entry;
   strncpy(entry.name, name, FILENAMESIZE);
@@ -134,9 +114,6 @@ bool createFile(const char *name, int size, int &startAddress) {
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Command: STORE name size <data>
-// ---------------------------------------------------------------------------
 void storeCommand() {
   char name[BUFSIZE];
   char sizeStr[BUFSIZE];
@@ -155,22 +132,17 @@ void storeCommand() {
     return;
   }
 
-  // Read exactly `size` data bytes from the serial port, while still letting
-  // the running processes tick along.
+  // Read exactly `size` data bytes, keeping processes ticking meanwhile.
   for (int i = 0; i < size; i++) {
     while (!Serial.available()) runProcesses();
     writeByteEEPROM(start + i, (byte)Serial.read());
   }
-  // Discard anything left in the serial buffer (e.g. a trailing newline).
-  while (Serial.available()) Serial.read();
+  while (Serial.available()) Serial.read(); // drop a trailing newline etc.
 
   Serial.print(F("Stored file "));
   Serial.println(name);
 }
 
-// ---------------------------------------------------------------------------
-// Command: RETRIEVE name
-// ---------------------------------------------------------------------------
 void retrieveCommand() {
   char name[BUFSIZE];
   waitForToken(name);
@@ -188,9 +160,6 @@ void retrieveCommand() {
   Serial.println();
 }
 
-// ---------------------------------------------------------------------------
-// Command: ERASE name
-// ---------------------------------------------------------------------------
 void eraseCommand() {
   char name[BUFSIZE];
   waitForToken(name);
@@ -200,7 +169,7 @@ void eraseCommand() {
     Serial.println(F("ERROR: file not found"));
     return;
   }
-  // Remove the entry by shifting every later entry one place up.
+  // Shift every later entry up one place.
   FATEntry entry;
   for (int i = index; i < noOfFiles - 1; i++) {
     readFATEntry(i + 1, entry);
@@ -212,9 +181,6 @@ void eraseCommand() {
   Serial.println(name);
 }
 
-// ---------------------------------------------------------------------------
-// Command: FILES
-// ---------------------------------------------------------------------------
 void filesCommand() {
   Serial.print(noOfFiles);
   Serial.println(F(" file(s):"));
@@ -229,9 +195,6 @@ void filesCommand() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Command: FREESPACE
-// ---------------------------------------------------------------------------
 void freespaceCommand() {
   Serial.print(F("Largest free block: "));
   Serial.print(maxFreeSpace());
